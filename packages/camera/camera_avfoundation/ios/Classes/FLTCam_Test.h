@@ -53,6 +53,7 @@
                videoCaptureSession:(AVCaptureSession *)videoCaptureSession
                audioCaptureSession:(AVCaptureSession *)audioCaptureSession
                captureSessionQueue:(dispatch_queue_t)captureSessionQueue
+				   locationManager:(CLLocationManager*)locationManager
                              error:(NSError **)error;
 
 /// Start streaming images.

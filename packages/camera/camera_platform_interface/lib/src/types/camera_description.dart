@@ -22,12 +22,17 @@ class CameraDescription {
   /// Creates a new camera description with the given properties.
   const CameraDescription({
     required this.name,
+    required this.localizedName,
     required this.lensDirection,
     required this.sensorOrientation,
   });
 
   /// The name of the camera device.
   final String name;
+
+  /// The localized name of the camera device.
+  /// This is the name that should be displayed to the user.
+  final String localizedName;
 
   /// The direction the camera is facing.
   final CameraLensDirection lensDirection;
@@ -55,6 +60,6 @@ class CameraDescription {
   @override
   String toString() {
     return '${objectRuntimeType(this, 'CameraDescription')}('
-        '$name, $lensDirection, $sensorOrientation)';
+        '$name, $localizedName, $lensDirection, $sensorOrientation)';
   }
 }

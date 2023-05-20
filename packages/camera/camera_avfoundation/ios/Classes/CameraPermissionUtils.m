@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 @import AVFoundation;
+@import CoreLocation;
 #import "CameraPermissionUtils.h"
 
 void FLTRequestPermission(BOOL forAudio, FLTCameraPermissionRequestCompletionHandler handler) {
