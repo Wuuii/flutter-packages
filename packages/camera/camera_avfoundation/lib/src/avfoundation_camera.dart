@@ -78,9 +78,15 @@ class AVFoundationCamera extends CameraPlatform {
         return <CameraDescription>[];
       }
 
+      print("#### Available cameras");
+      cameras.forEach((element) {
+        print("\t* ${element['name']}");
+      });
+
       return cameras.map((Map<dynamic, dynamic> camera) {
         return CameraDescription(
           name: camera['name']! as String,
+          localizedName: camera['localizedName']! as String,
           lensDirection:
               parseCameraLensDirection(camera['lensFacing']! as String),
           sensorOrientation: camera['sensorOrientation']! as int,

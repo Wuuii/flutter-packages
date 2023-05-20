@@ -115,6 +115,7 @@ abstract class CameraPlatform extends PlatformInterface {
   }
 
   /// Captures an image and returns the file where it was saved.
+  // Future<XFile> takePicture(int cameraId) {
   Future<XFile> takePicture(int cameraId) {
     throw UnimplementedError('takePicture() is not implemented.');
   }

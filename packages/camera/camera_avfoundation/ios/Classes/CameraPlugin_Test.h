@@ -46,6 +46,7 @@
 /// @param createMethodCall the create method call
 /// @param result a thread safe flutter result wrapper object to report creation result.
 - (void)createCameraOnSessionQueueWithCreateMethodCall:(FlutterMethodCall *)createMethodCall
+									   locationManager:(CLLocationManager *)locationManager
                                                 result:(FLTThreadSafeFlutterResult *)result;
 
 @end

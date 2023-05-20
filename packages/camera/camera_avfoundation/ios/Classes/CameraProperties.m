@@ -181,7 +181,7 @@ OSType FLTGetVideoFormatFromString(NSString *videoFormatString) {
   } else if ([videoFormatString isEqualToString:@"yuv420"]) {
     return kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange;
   } else {
-    NSLog(@"The selected imageFormatGroup is not supported by iOS. Defaulting to brga8888");
+    NSLog(@"The selected [%@] imageFormatGroup is not supported by iOS. Defaulting to brga8888",videoFormatString);
     return kCVPixelFormatType_32BGRA;
   }
 }

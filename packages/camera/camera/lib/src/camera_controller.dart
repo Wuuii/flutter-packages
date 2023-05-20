@@ -425,6 +425,10 @@ class CameraController extends ValueNotifier<CameraValue> {
     } on PlatformException catch (e) {
       value = value.copyWith(isTakingPicture: false);
       throw CameraException(e.code, e.message);
+    } catch (e) {
+      value = value.copyWith(isTakingPicture: false);
+      print('takePicture error: $e');
+      rethrow;
     }
   }
 

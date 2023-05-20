@@ -6,6 +6,7 @@
 #import "CameraPlugin_Test.h"
 
 @import AVFoundation;
+@import CoreLocation;
 
 #import "CameraPermissionUtils.h"
 #import "CameraProperties.h"
@@ -19,6 +20,7 @@
 @interface CameraPlugin ()
 @property(readonly, nonatomic) FLTThreadSafeTextureRegistry *registry;
 @property(readonly, nonatomic) NSObject<FlutterBinaryMessenger> *messenger;
+@property(readonly, nonatomic) CLLocationManager *locationManager;
 @end
 
 @implementation CameraPlugin
@@ -105,16 +107,27 @@
                        result:(FLTThreadSafeFlutterResult *)result {
   if ([@"availableCameras" isEqualToString:call.method]) {
     NSMutableArray *discoveryDevices =
-        [@[ AVCaptureDeviceTypeBuiltInWideAngleCamera, AVCaptureDeviceTypeBuiltInTelephotoCamera ]
+        [@[ AVCaptureDeviceTypeBuiltInWideAngleCamera, 
+        AVCaptureDeviceTypeBuiltInTelephotoCamera, 
+        AVCaptureDeviceTypeBuiltInDualCamera ]
             mutableCopy];
+    if (@available(iOS 11.1, *)) {
+      [discoveryDevices addObject:AVCaptureDeviceTypeBuiltInTrueDepthCamera];
+    }
     if (@available(iOS 13.0, *)) {
       [discoveryDevices addObject:AVCaptureDeviceTypeBuiltInUltraWideCamera];
+      [discoveryDevices addObject:AVCaptureDeviceTypeBuiltInDualWideCamera];
     }
+    if (@available(iOS 15.4, *)) {
+      [discoveryDevices addObject:AVCaptureDeviceTypeBuiltInLiDARDepthCamera];
+    }
+    NSLog(@"discoveryDevices: %@", discoveryDevices);
     AVCaptureDeviceDiscoverySession *discoverySession = [AVCaptureDeviceDiscoverySession
         discoverySessionWithDeviceTypes:discoveryDevices
                               mediaType:AVMediaTypeVideo
                                position:AVCaptureDevicePositionUnspecified];
     NSArray<AVCaptureDevice *> *devices = discoverySession.devices;
+    NSLog(@"devices: %@", devices);
     NSMutableArray<NSDictionary<NSString *, NSObject *> *> *reply =
         [[NSMutableArray alloc] initWithCapacity:devices.count];
     for (AVCaptureDevice *device in devices) {
@@ -132,6 +145,7 @@
       }
       [reply addObject:@{
         @"name" : [device uniqueID],
+        @"localizedName" : [device localizedName],
         @"lensFacing" : lensFacing,
         @"sensorOrientation" : @90,
       }];
@@ -272,6 +286,23 @@
     if (error) {
       [result sendFlutterError:error];
     } else {
+      // Create core location manager, and request permission if necessary.
+      strongSelf->_locationManager = [[CLLocationManager alloc] init];
+      switch ([CLLocationManager authorizationStatus]) {
+        case kCLAuthorizationStatusAuthorizedWhenInUse:
+            NSLog(@"Location permission granted, will add GPS metadata to photos."); 
+            break;
+
+        case kCLAuthorizationStatusNotDetermined:
+            [strongSelf->_locationManager requestWhenInUseAuthorization];
+            // locationManagerStatus = CLLocationManager.authorizationStatus();
+
+        default:
+            // locationManagerStatus = .denied;
+            NSLog(@"*** Location permission denied, unable to add GPS metadata to photos.");
+      }
+
+
       // Request audio permission on `create` call with `enableAudio` argument instead of the
       // `prepareForVideoRecording` call. This is because `prepareForVideoRecording` call is
       // optional, and used as a workaround to fix a missing frame issue on iOS.
@@ -285,17 +316,18 @@
           if (error) {
             [result sendFlutterError:error];
           } else {
-            [strongSelf createCameraOnSessionQueueWithCreateMethodCall:call result:result];
+            [strongSelf createCameraOnSessionQueueWithCreateMethodCall:call locationManager:strongSelf->_locationManager result:result];
           }
         });
       } else {
-        [strongSelf createCameraOnSessionQueueWithCreateMethodCall:call result:result];
+        [strongSelf createCameraOnSessionQueueWithCreateMethodCall:call locationManager:strongSelf->_locationManager result:result];
       }
     }
   });
 }
 
 - (void)createCameraOnSessionQueueWithCreateMethodCall:(FlutterMethodCall *)createMethodCall
+                                      locationManager:(CLLocationManager *)locationManager
                                                 result:(FLTThreadSafeFlutterResult *)result {
   __weak typeof(self) weakSelf = self;
   dispatch_async(self.captureSessionQueue, ^{
@@ -311,6 +343,7 @@
                                          enableAudio:[enableAudio boolValue]
                                          orientation:[[UIDevice currentDevice] orientation]
                                  captureSessionQueue:strongSelf.captureSessionQueue
+                                      locationManager:locationManager
                                                error:&error];
 
     if (error) {
