@@ -167,10 +167,10 @@ NSString *const errorMethod = @"error";
 
 	NSArray* depthFormats = [_captureDevice.activeFormat supportedDepthDataFormats];
 
-	NSLog(@"CapPhotOut => %@ [%@]",self.capturePhotoOutput,_captureDevice);
-	NSLog(@"Active Format => %@",_captureDevice.activeFormat);
-	NSLog(@"Active Depth Format => %@",_captureDevice.activeDepthDataFormat);
-	NSLog(@"Depth Formats => %@", depthFormats);
+	NSLog(@"Camera.PhotoOutput       => %@ [%@]",self.capturePhotoOutput,_captureDevice);
+	NSLog(@"Camera.ActiveFormat      => %@",_captureDevice.activeFormat);
+	NSLog(@"Camera.ActiveDepthFormat => %@",_captureDevice.activeDepthDataFormat);
+	NSLog(@"Camera.DepthFormats      => %@", depthFormats);
 //	for( AVCaptureDeviceFormat *format in depthFormats ) {
 //		CMFormatDescriptionRef ref = format.formatDescription;
 //		NSLog(@"%@ - %@",format,ref);
@@ -190,7 +190,7 @@ NSString *const errorMethod = @"error";
 	[_videoCaptureSession addOutput:_capturePhotoOutput];
 
 	CLLocation *location = [_locationManager location];
-	NSLog(@"Init Location => %@ -> %@",_locationManager, location);
+	NSLog(@"Camera.InitLocation      => %@      => %@",_locationManager, location);
 
 	_motionManager = [[CMMotionManager alloc] init];
 	[_motionManager startAccelerometerUpdates];
@@ -288,7 +288,7 @@ NSString *const errorMethod = @"error";
 		if ( [obj isKindOfClass:[NSData class]] )
 		{
 			mutableDict[key] = [obj base64EncodedStringWithOptions:NSDataBase64Encoding64CharacterLineLength];
-			NSLog(@"key: %@  newValue:%@",key,mutableDict[key]);
+			// NSLog(@"key: %@  newValue:%@",key,mutableDict[key]);
 		}
 		else if ( [obj isKindOfClass:[NSDictionary class]] )
 		{

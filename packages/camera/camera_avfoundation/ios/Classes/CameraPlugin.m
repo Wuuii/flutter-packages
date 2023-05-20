@@ -121,13 +121,13 @@
     if (@available(iOS 15.4, *)) {
       [discoveryDevices addObject:AVCaptureDeviceTypeBuiltInLiDARDepthCamera];
     }
-    NSLog(@"discoveryDevices: %@", discoveryDevices);
+    NSLog(@"cameraDeviceTypes: %@", discoveryDevices);
     AVCaptureDeviceDiscoverySession *discoverySession = [AVCaptureDeviceDiscoverySession
         discoverySessionWithDeviceTypes:discoveryDevices
                               mediaType:AVMediaTypeVideo
                                position:AVCaptureDevicePositionUnspecified];
     NSArray<AVCaptureDevice *> *devices = discoverySession.devices;
-    NSLog(@"devices: %@", devices);
+    NSLog(@"cameraDevicesFound: %@", devices);
     NSMutableArray<NSDictionary<NSString *, NSObject *> *> *reply =
         [[NSMutableArray alloc] initWithCapacity:devices.count];
     for (AVCaptureDevice *device in devices) {
