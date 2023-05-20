@@ -53,6 +53,7 @@ class CameraWindows extends CameraPlatform {
       return cameras.map((Map<dynamic, dynamic> camera) {
         return CameraDescription(
           name: camera['name'] as String,
+          localizedName: camera['name'] as String,
           lensDirection:
               parseCameraLensDirection(camera['lensFacing'] as String),
           sensorOrientation: camera['sensorOrientation'] as int,
