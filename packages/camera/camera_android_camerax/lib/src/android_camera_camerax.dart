@@ -190,6 +190,7 @@ class AndroidCameraCameraX extends CameraPlatform {
 
       cameraDescriptions.add(CameraDescription(
           name: cameraName,
+          localizedName: cameraName,
           lensDirection: cameraLensDirection,
           sensorOrientation: cameraSensorOrientation));
     }

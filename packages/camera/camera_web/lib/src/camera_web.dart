@@ -162,6 +162,7 @@ class CameraPlugin extends CameraPlatform {
           final String cameraLabel = videoInputDevice.label ?? '';
           final CameraDescription camera = CameraDescription(
             name: cameraLabel,
+            localizedName: cameraLabel,
             lensDirection: lensDirection,
             sensorOrientation: 0,
           );
