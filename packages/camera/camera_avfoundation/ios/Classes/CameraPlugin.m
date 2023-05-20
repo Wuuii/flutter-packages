@@ -290,7 +290,7 @@
       strongSelf->_locationManager = [[CLLocationManager alloc] init];
       switch ([CLLocationManager authorizationStatus]) {
         case kCLAuthorizationStatusAuthorizedWhenInUse:
-            NSLog(@"Location permission granted, will add GPS metadata to photos."); 
+            NSLog(@"Camera: Location permission granted, will add GPS metadata to photos."); 
             break;
 
         case kCLAuthorizationStatusNotDetermined:
@@ -299,7 +299,7 @@
 
         default:
             // locationManagerStatus = .denied;
-            NSLog(@"*** Location permission denied, unable to add GPS metadata to photos.");
+            NSLog(@"*** Camera: Location permission denied, unable to add GPS metadata to photos.");
       }
 
 
