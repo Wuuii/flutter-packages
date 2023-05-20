@@ -18,7 +18,11 @@ flutter:
 
 dependencies:
   camera_platform_interface: #^2.4.0
-    path: ../camera_platform_interface/
+    # path: ../camera_platform_interface/
+    git:
+      url: https://github.com/Wuuii/flutter-packages.git
+      ref: main
+      path: packages/camera/camera_platform_interface/
   flutter:
     sdk: flutter
   stream_transform: ^2.0.0
