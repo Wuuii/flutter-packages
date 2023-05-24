@@ -167,30 +167,49 @@ NSString *const errorMethod = @"error";
 
 	NSArray* depthFormats = [_captureDevice.activeFormat supportedDepthDataFormats];
 
-	NSLog(@"Camera.PhotoOutput       => %@ [%@]",self.capturePhotoOutput,_captureDevice);
-	NSLog(@"Camera.ActiveFormat      => %@",_captureDevice.activeFormat);
-	NSLog(@"Camera.ActiveDepthFormat => %@",_captureDevice.activeDepthDataFormat);
-	NSLog(@"Camera.DepthFormats      => %@", depthFormats);
-//	for( AVCaptureDeviceFormat *format in depthFormats ) {
-//		CMFormatDescriptionRef ref = format.formatDescription;
-//		NSLog(@"%@ - %@",format,ref);
-////		AVVideoCodecTypeH264
-//
-//	}
+	CMVideoDimensions bestDepthDims = { .width = 0, .height = 0 };
+	AVCaptureDeviceFormat *bestDepthFormat = nil;
+	for( AVCaptureDeviceFormat *format in depthFormats ) {
+		FourCharCode pixelFormatType = CMFormatDescriptionGetMediaSubType(format.formatDescription);
+		CMVideoDimensions dims = CMVideoFormatDescriptionGetDimensions(format.formatDescription);
+
+		if( pixelFormatType == kCVPixelFormatType_DepthFloat16)
+		{
+			if( dims.width >= bestDepthDims.width || dims.height >= bestDepthDims.height )
+			{
+				bestDepthFormat = format;
+//				NSLog(@"Camera.BestDepthFormat => %@, %u,%u",bestDepthFormat,dims.width,dims.height);
+			}
+		}
+	}
 
 	// kCVPixelFormatType_DepthFloat16 = hdep
 	// kCVPixelFormatType_DepthFloat32 = fdep
 	// kCVPixelFormatType_DisparityFloat16 = hdis
 	// kCVPixelFormatType_DisparityFloat32 = fdis
+
 	// fov=62.331, 320x180 - 1x Lidar
 	// fov:73.292, 640x360 - 1x TrueDepth
 	// fov=37.784, 320x180 - 1x Dual
 	// fov=70.291, 320x180 - 0.5x Dual
 
+	// set the depth data format to the max possible quality
+	if( bestDepthFormat != nil ) {
+		[_captureDevice lockForConfiguration:nil];
+		NSLog(@"Setting Camera.ActiveDepthFormat      => %@",bestDepthFormat);
+		[_captureDevice setActiveDepthDataFormat:bestDepthFormat];
+		[_captureDevice unlockForConfiguration];
+	}
+
+	NSLog(@"Camera.PhotoOutput       => %@ [%@]",self.capturePhotoOutput,_captureDevice);
+	NSLog(@"Camera.ActiveFormat      => %@",_captureDevice.activeFormat);
+	NSLog(@"Camera.ActiveDepthFormat => %@",_captureDevice.activeDepthDataFormat);
+	NSLog(@"Camera.DepthFormats      => %@", depthFormats);
+
 	[_videoCaptureSession addOutput:_capturePhotoOutput];
 
 	CLLocation *location = [_locationManager location];
-	NSLog(@"Camera.InitLocation      => %@      => %@",_locationManager, location);
+	NSLog(@"Camera.InitLocation      => %@      Location: %@",_locationManager, location);
 
 	_motionManager = [[CMMotionManager alloc] init];
 	[_motionManager startAccelerometerUpdates];
@@ -368,6 +387,7 @@ NSString *const errorMethod = @"error";
 			NSDictionary *sanitizedMetaData = [self sanitizeDictionary:metaData];
 			NSError *error;
 			NSData *jsonData = [NSJSONSerialization dataWithJSONObject:sanitizedMetaData options:NSJSONWritingPrettyPrinted error:&error];
+			NSLog(@"JSON: %@",jsonData);
 			[jsonData writeToFile:[path stringByAppendingString:@".json"] atomically:YES];
 			[result sendSuccessWithData:path];
 		}
@@ -447,6 +467,12 @@ NSString *const errorMethod = @"error";
 - (void)setCaptureSessionPreset:(FLTResolutionPreset)resolutionPreset {
 	switch (resolutionPreset) {
 		case FLTResolutionPresetMax:
+			if ([_videoCaptureSession canSetSessionPreset:AVCaptureSessionPresetPhoto]) {
+				_videoCaptureSession.sessionPreset = AVCaptureSessionPresetPhoto;
+				_previewSize = CGSizeMake(_captureDevice.activeFormat.highResolutionStillImageDimensions.width,
+						   _captureDevice.activeFormat.highResolutionStillImageDimensions.height);
+				break;
+			}
 		case FLTResolutionPresetUltraHigh:
 			if ([_videoCaptureSession canSetSessionPreset:AVCaptureSessionPreset3840x2160]) {
 				_videoCaptureSession.sessionPreset = AVCaptureSessionPreset3840x2160;
@@ -455,8 +481,7 @@ NSString *const errorMethod = @"error";
 			}
 			if ([_videoCaptureSession canSetSessionPreset:AVCaptureSessionPresetHigh]) {
 				_videoCaptureSession.sessionPreset = AVCaptureSessionPresetHigh;
-				_previewSize =
-				CGSizeMake(_captureDevice.activeFormat.highResolutionStillImageDimensions.width,
+				_previewSize = CGSizeMake(_captureDevice.activeFormat.highResolutionStillImageDimensions.width,
 						   _captureDevice.activeFormat.highResolutionStillImageDimensions.height);
 				break;
 			}

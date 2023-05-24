@@ -259,8 +259,18 @@
 	CMDeviceMotion *motion = [_motionManager deviceMotion];
 	[metaData setObject:[self MotionDictionaryFor:motion] forKey:@"{DeviceMotion}"];
 
+	// Add a depth data embedded key
+	[metaData setObject:(photo.depthData != nil)?@(YES):@(NO) forKey:@"DepthDataEmbedded"];
+
 	return metaData;
 }
+
+//- (AVDepthData *)replacementDepthDataForPhoto:(AVCapturePhoto *)photo
+//{
+//	NSLog(@"Camera: Depth Data: %@",photo.depthData);
+//	_containsDepthData = (photo.depthData != nil);
+//	return photo.depthData;
+//}
 
 //- (void)captureOutput:(AVCapturePhotoOutput *)output
 //didFinishProcessingPhoto:(AVCapturePhoto *)photo
