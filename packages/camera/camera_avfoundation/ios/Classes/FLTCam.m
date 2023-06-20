@@ -1074,6 +1074,7 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
 			// No rotation required
 			break;
 	}
+	// NSLog(@"CGPointForCoords:  %f, %f => %f, %f (%ld==%ld)", oldX, oldY, x, y, (long)orientation, (long)UIDeviceOrientationPortrait );
 	return CGPointMake(x, y);
 }
 
@@ -1084,7 +1085,10 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
 						  details:nil];
 		return;
 	}
-	UIDeviceOrientation orientation = [[UIDevice currentDevice] orientation];
+	// UIDeviceOrientation orientation = [[UIDevice currentDevice] orientation];
+	UIDeviceOrientation orientation = (_lockedCaptureOrientation != UIDeviceOrientationUnknown)
+									? _lockedCaptureOrientation
+									: _deviceOrientation;
 	[_captureDevice lockForConfiguration:nil];
 	[_captureDevice setExposurePointOfInterest:[self getCGPointForCoordsWithOrientation:orientation
 																					  x:x
@@ -1102,7 +1106,10 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
 						  details:nil];
 		return;
 	}
-	UIDeviceOrientation orientation = [[UIDevice currentDevice] orientation];
+	// UIDeviceOrientation orientation = [[UIDevice currentDevice] orientation];
+	UIDeviceOrientation orientation = (_lockedCaptureOrientation != UIDeviceOrientationUnknown)
+									? _lockedCaptureOrientation
+									: _deviceOrientation;
 	[_captureDevice lockForConfiguration:nil];
 
 	[_captureDevice setFocusPointOfInterest:[self getCGPointForCoordsWithOrientation:orientation
