@@ -117,6 +117,7 @@
     if (@available(iOS 13.0, *)) {
       [discoveryDevices addObject:AVCaptureDeviceTypeBuiltInUltraWideCamera];
       [discoveryDevices addObject:AVCaptureDeviceTypeBuiltInDualWideCamera];
+      [discoveryDevices addObject:AVCaptureDeviceTypeBuiltInTripleCamera];
     }
     if (@available(iOS 15.4, *)) {
       [discoveryDevices addObject:AVCaptureDeviceTypeBuiltInLiDARDepthCamera];
