@@ -323,8 +323,8 @@ NSString *const errorMethod = @"error";
 	// Set capture file type
 	// TODO(Khalu): Change this back to HEIC when the backend supports it.
 	AVCapturePhotoSettings *settings = [AVCapturePhotoSettings photoSettingsWithFormat:@{
-		// (NSString *)AVVideoCodecKey : AVVideoCodecTypeHEVC
-		(NSString *)AVVideoCodecKey : AVVideoCodecTypeJPEG // JPEG strips the GPS data
+		(NSString *)AVVideoCodecKey : AVVideoCodecTypeHEVC
+		// (NSString *)AVVideoCodecKey : AVVideoCodecTypeJPEG // JPEG strips the GPS data
 	}];
 
 	// Enable depth data delivery if it is supported.
@@ -347,8 +347,8 @@ NSString *const errorMethod = @"error";
 
 	NSError *error;
 	// TODO(Khalu): Change this back to HEIC when the backend supports it.
-	// NSString *path = [self getTemporaryFilePathWithExtension:@"heic"
-	NSString *path = [self getTemporaryFilePathWithExtension:@"jpg"
+	NSString *path = [self getTemporaryFilePathWithExtension:@"heic"
+	// NSString *path = [self getTemporaryFilePathWithExtension:@"jpg"
 												   subfolder:@"pictures"
 													  prefix:@"CAP_"
 													   error:error];
