@@ -318,27 +318,45 @@ NSString *const errorMethod = @"error";
 	return mutableDict;
 }
 
+- (NSData *)convertCVPixelBufferToNSData:(CVPixelBufferRef)pixelBuffer {
+	CVPixelBufferLockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+
+	int bufferWidth = (int)CVPixelBufferGetWidth(pixelBuffer);
+	int bufferHeight = (int)CVPixelBufferGetHeight(pixelBuffer);
+	size_t bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer);
+
+	uint8_t *baseAddress = (uint8_t *)CVPixelBufferGetBaseAddress(pixelBuffer);
+	size_t size = bytesPerRow * bufferHeight;
+	NSData *data = [NSData dataWithBytes:baseAddress length:size];
+
+	CVPixelBufferUnlockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+
+	return data;
+}
+
 - (void)captureToFile:(FLTThreadSafeFlutterResult *)result {
 
 	// Set capture file type
-	// TODO(Khalu): Change this back to HEIC when the backend supports it.
 	AVCapturePhotoSettings *settings = [AVCapturePhotoSettings photoSettingsWithFormat:@{
 		(NSString *)AVVideoCodecKey : AVVideoCodecTypeHEVC
 		// (NSString *)AVVideoCodecKey : AVVideoCodecTypeJPEG // JPEG strips the GPS data
 	}];
 
+	if (_resolutionPreset == FLTResolutionPresetMax) {
+		[settings setHighResolutionPhotoEnabled:YES];
+	}
+
 	// Enable depth data delivery if it is supported.
 	[settings setDepthDataDeliveryEnabled:self.capturePhotoOutput.depthDataDeliverySupported];
 
 	// Embed depth data if it is supported and photo output is configured to deliver it.
-	[settings setEmbedsDepthDataInPhoto:YES];
+	// libHeif doesn't currently support unfiltered depth data, so we won't embed it.
+	[settings setEmbedsDepthDataInPhoto:NO];
 
-	// Don't somooth depth data, bad for computer vision. No, no, bad algo, sit! Good boy.
+	// Don't smooth depth data, bad for computer vision. No, no, bad algo, sit! Good boy.
+	// This also breaks libheif currently.  It can't handle NaNs in the depth data.
 	[settings setDepthDataFiltered:NO];
 
-	if (_resolutionPreset == FLTResolutionPresetMax) {
-		[settings setHighResolutionPhotoEnabled:YES];
-	}
 
 	AVCaptureFlashMode avFlashMode = FLTGetAVCaptureFlashModeForFLTFlashMode(_flashMode);
 	if (avFlashMode != -1) {
@@ -346,9 +364,7 @@ NSString *const errorMethod = @"error";
 	}
 
 	NSError *error;
-	// TODO(Khalu): Change this back to HEIC when the backend supports it.
 	NSString *path = [self getTemporaryFilePathWithExtension:@"heic"
-	// NSString *path = [self getTemporaryFilePathWithExtension:@"jpg"
 												   subfolder:@"pictures"
 													  prefix:@"CAP_"
 													   error:error];
@@ -365,11 +381,8 @@ NSString *const errorMethod = @"error";
 											   motionManager:_motionManager
 											   completionHandler:^(NSString *_Nullable path,
 																   NSDictionary *_Nullable metaData,
+																   AVDepthData *_Nullable depthData,
 																   NSError *_Nullable error) {
-
-		// NSLog(@"-----> callback path: %@",path);
-		// NSLog(@"-----> callback meta: %@",metaData);
-		// NSLog(@"-----> callback error: %@",error);
 
 		typeof(self) strongSelf = weakSelf;
 		if (!strongSelf) return;
@@ -384,27 +397,87 @@ NSString *const errorMethod = @"error";
 			[result sendError:error];
 		} else {
 			NSAssert(path, @"Path must not be nil if no error.");
+
+			// Save metadata to json file
 			NSDictionary *sanitizedMetaData = [self sanitizeDictionary:metaData];
 			NSError *error;
-			NSData *jsonData = [NSJSONSerialization dataWithJSONObject:sanitizedMetaData options:NSJSONWritingPrettyPrinted error:&error];
-			NSLog(@"JSON: %@",jsonData);
-			[jsonData writeToFile:[path stringByAppendingString:@".json"] atomically:YES];
+//			NSLog(@"Camera: Sanitized Metadata: %@",sanitizedMetaData);
+
+			@try
+			{
+				NSData *jsonData = [NSJSONSerialization dataWithJSONObject:sanitizedMetaData options:NSJSONWritingPrettyPrinted error:&error];
+				if (jsonData == nil )
+				{
+					[result sendError:error];
+					return;
+				}
+//				NSLog(@"Camera: Metadata converted to JSON: %@",jsonData);
+				[jsonData writeToFile:[path stringByAppendingString:@".json"] atomically:YES];
+			}
+			@catch( NSException *exception )
+			{
+				NSMutableDictionary * info = [NSMutableDictionary dictionary];
+				[info setValue:exception.name forKey:@"ExceptionName"];
+				[info setValue:exception.reason forKey:@"ExceptionReason"];
+				[info setValue:exception.callStackReturnAddresses forKey:@"ExceptionCallStackReturnAddresses"];
+				[info setValue:exception.callStackSymbols forKey:@"ExceptionCallStackSymbols"];
+				[info setValue:exception.userInfo forKey:@"ExceptionUserInfo"];
+
+				NSError *error = [[NSError alloc] initWithDomain:[[NSBundle mainBundle] bundleIdentifier] code:NSFileWriteUnknownError userInfo:info];
+				NSLog(@"*** Unable to parse and save meta data: %@",exception);
+				[result sendError:error];
+				return;
+			}
+
+			// Save depth data to .depth file if it exists
+			if (depthData != nil) {
+
+				// get the raw pixel data from AVDepthData
+				CVPixelBufferRef depthDataBuffer = [depthData depthDataMap];
+//				NSLog(@"Camera: depthDataRaw = %@",depthDataRaw);
+				NSData *depthDataRaw = [self convertCVPixelBufferToNSData:depthDataBuffer];
+
+				// try to write the depth data to a file
+				@try
+				{
+					[depthDataRaw writeToFile:[path stringByAppendingString:@".depth"] atomically:YES];
+				}
+				@catch( NSException *exception )
+				{
+					NSMutableDictionary * info = [NSMutableDictionary dictionary];
+					[info setValue:exception.name forKey:@"ExceptionName"];
+					[info setValue:exception.reason forKey:@"ExceptionReason"];
+					[info setValue:exception.callStackReturnAddresses forKey:@"ExceptionCallStackReturnAddresses"];
+					[info setValue:exception.callStackSymbols forKey:@"ExceptionCallStackSymbols"];
+					[info setValue:exception.userInfo forKey:@"ExceptionUserInfo"];
+
+					NSError *error = [[NSError alloc] initWithDomain:[[NSBundle mainBundle] bundleIdentifier] code:NSFileWriteUnknownError userInfo:info];
+					NSLog(@"*** Unable to save depth data: %@",exception);
+					[result sendError:error];
+					return;	
+				}
+			}
+			else
+			{
+				NSLog(@"Camera: No Depth Data");
+			}
+
 			[result sendSuccessWithData:path];
 		}
 	}];
 
 	CLLocation *location = [_locationManager location];
-	NSLog(@"Init Location => %@ -> %@",_locationManager, location);
+	// NSLog(@"Init Location => %@ -> %@",_locationManager, location);
 
 	NSAssert(dispatch_get_specific(FLTCaptureSessionQueueSpecific),
-			 @"save photo delegate references must be updated on the capture session queue");
+			 @"Save photo delegate references must be updated on the capture session queue.");
 	self.inProgressSavePhotoDelegates[@(settings.uniqueID)] = savePhotoDelegate;
-	NSLog(@"Capture Settings => %@", settings);
-	NSLog(@"+CapPhotOut => %@",self.capturePhotoOutput);
-	NSLog(@"+Capture Output EN => %@", [self.capturePhotoOutput isDepthDataDeliveryEnabled] ? @"YES" : @"NO");
-	NSLog(@"+Capture Output SU => %@", [self.capturePhotoOutput isDepthDataDeliverySupported] ? @"YES" : @"NO");
+	NSLog(@"Camera: Capture Settings => %@", settings);
+	NSLog(@"Camera: Capture Photo Output => %@",self.capturePhotoOutput);
+	NSLog(@"Camera: Capture Photo Output (Depth Data Delivery Enabled) => %@", [self.capturePhotoOutput isDepthDataDeliveryEnabled] ? @"YES" : @"NO");
+	NSLog(@"Camera: Capture Photo Output (Depth Data Delivery Supported) => %@", [self.capturePhotoOutput isDepthDataDeliverySupported] ? @"YES" : @"NO");
 	[self.capturePhotoOutput setDepthDataDeliveryEnabled:[self.capturePhotoOutput isDepthDataDeliverySupported]];
-	NSLog(@"+++Capture Output EN => %@", [self.capturePhotoOutput isDepthDataDeliveryEnabled] ? @"YES" : @"NO");
+	NSLog(@"Camera: Capture Photo Output [After Setting] (Depth Data Delivery Enabled) => %@", [self.capturePhotoOutput isDepthDataDeliveryEnabled] ? @"YES" : @"NO");
 
 	[self.capturePhotoOutput capturePhotoWithSettings:settings delegate:savePhotoDelegate];
 }
@@ -428,14 +501,6 @@ NSString *const errorMethod = @"error";
 	}
 }
 
-// + (NSString *)temporaryFilePath:(NSString *)suffix {
-//   NSString *fileExtension = [@"image_picker_%@" stringByAppendingString:suffix];
-//   NSString *guid = [[NSProcessInfo processInfo] globallyUniqueString];
-//   NSString *tmpFile = [NSString stringWithFormat:fileExtension, guid];
-//   NSString *tmpDirectory = NSTemporaryDirectory();
-//   NSString *tmpPath = [tmpDirectory stringByAppendingPathComponent:tmpFile];
-//   return tmpPath;
-// }
 
 - (NSString *)getTemporaryFilePathWithExtension:(NSString *)extension
 									  subfolder:(NSString *)subfolder

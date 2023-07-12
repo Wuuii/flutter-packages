@@ -21,6 +21,7 @@ NS_ASSUME_NONNULL_BEGIN
 /// @param error photo capture error or IO error.
 typedef void (^FLTSavePhotoDelegateCompletionHandler)(NSString *_Nullable path,
                                                       NSDictionary *_Nullable metaData,
+													  AVDepthData *_Nullable depthData,
                                                       NSError *_Nullable error);
 
 /**

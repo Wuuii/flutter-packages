@@ -38,7 +38,7 @@
 - (void)handlePhotoCaptureResultWithError:(NSError *)error
 						photoDataProvider:(NSData * (^)(void))photoDataProvider {
 	if (error) {
-		self.completionHandler(nil, nil, error);
+		self.completionHandler(nil, nil, nil, error);
 		return;
 	}
 	__weak typeof(self) weakSelf = self;
@@ -49,9 +49,9 @@
 		NSData *data = photoDataProvider();
 		NSError *ioError;
 		if ([data writeToFile:strongSelf.path options:NSDataWritingAtomic error:&ioError]) {
-			strongSelf.completionHandler(self.path, nil, nil);
+			strongSelf.completionHandler(self.path, nil, nil, nil);
 		} else {
-			strongSelf.completionHandler(nil, nil, ioError);
+			strongSelf.completionHandler(nil, nil, nil, ioError);
 		}
 	});
 }
@@ -61,15 +61,13 @@
 									photo:(AVCapturePhoto *)photo
 								 metaData:(NSDictionary *)metaData {
 	if (error) {
-		self.completionHandler(nil, nil, error);
+		self.completionHandler(nil, nil, nil, error);
 		return;
 	}
 	__weak typeof(self) weakSelf = self;
 	dispatch_async(self.ioQueue, ^{
 		typeof(self) strongSelf = weakSelf;
 		if (!strongSelf) return;
-
-		//NSLog(@"self.path: %@", self.path);
 
 		NSData *data = [photo fileDataRepresentationWithCustomizer:self];
 		NSMutableDictionary *mutableMetaData = [self->_metaData mutableCopy];
@@ -79,9 +77,9 @@
 
 		NSError *ioError;
 		if ([data writeToFile:strongSelf.path options:NSDataWritingAtomic error:&ioError]) {
-			strongSelf.completionHandler(self.path, mutableMetaData, nil);
+			strongSelf.completionHandler(self.path, mutableMetaData, photo.depthData, nil);
 		} else {
-			strongSelf.completionHandler(nil, nil, ioError);
+			strongSelf.completionHandler(nil, nil, nil, ioError);
 		}
 	});
 }
@@ -252,6 +250,61 @@
 	return metaData;
 }
 
+- (nullable CVPixelBufferRef)replacementEmbeddedThumbnailPixelBufferWithPhotoFormat:(NSDictionary<NSString *, id> *_Nullable * _Nonnull)replacementEmbeddedThumbnailPhotoFormatOut forPhoto:(AVCapturePhoto *)photo;
+{
+//	replacementEmbeddedThumbnailPhotoFormatOut = (NSDictionary<NSString *, id> **)photo.embeddedThumbnailPhotoFormat;
+	NSLog(@"Camera: Embedded Thumbnail Pixel Buffer: %@",photo.embeddedThumbnailPhotoFormat);
+	return nil;
+}
+
+- (nullable AVDepthData *)replacementDepthDataForPhoto:(AVCapturePhoto *)photo;
+{
+	NSLog(@"Camera: Depth Data: %@",photo.depthData);
+	// return photo.depthData;
+	return nil;
+}
+
+- (nullable AVPortraitEffectsMatte *)replacementPortraitEffectsMatteForPhoto:(AVCapturePhoto *)photo;
+{
+	NSLog(@"Camera: Portrait Effects Matte: %@",photo.portraitEffectsMatte);
+	return photo.portraitEffectsMatte;
+}
+
+- (nullable AVSemanticSegmentationMatte *)replacementSemanticSegmentationMatteOfType:(AVSemanticSegmentationMatteType)semanticSegmentationMatteType forPhoto:(AVCapturePhoto *)photo API_AVAILABLE(ios(13.0), macCatalyst(14.0)) API_UNAVAILABLE(tvos);
+{
+	NSLog(@"Camera: Semantic Segmentation Matte: %@",[photo semanticSegmentationMatteForType:semanticSegmentationMatteType]);
+	return [photo semanticSegmentationMatteForType:semanticSegmentationMatteType];
+}
+
+- (NSDictionary<NSString *, id> *)replacementAppleProRAWCompressionSettingsForPhoto:(AVCapturePhoto *)photo
+																	defaultSettings:(NSDictionary<NSString *, id> *)defaultSettings
+																	maximumBitDepth:(NSInteger)maximumBitDepth API_AVAILABLE(ios(14.3), macCatalyst(14.3)) API_UNAVAILABLE(macos, tvos) API_UNAVAILABLE(watchos);
+{
+	NSLog(@"Camera: Apple ProRAW Compression Settings: %@",defaultSettings);
+	return defaultSettings;
+}
+
+- (NSDictionary *)convertCGMetaDataToNSDictionary:(CGImageMetadataRef)imageMetadata
+{
+	CFArrayRef tags = CGImageMetadataCopyTags(imageMetadata);
+	long count = CFArrayGetCount(tags);
+
+	NSMutableDictionary *metadataDict = [NSMutableDictionary dictionary];
+
+	for (int i = 0; i < count; i++) {
+		CGImageMetadataTagRef tag = (CGImageMetadataTagRef)CFArrayGetValueAtIndex(tags, i);
+		NSString *tagName = (__bridge NSString *)CGImageMetadataTagCopyName(tag);
+		id tagValue = (__bridge id)CGImageMetadataTagCopyValue(tag);
+		metadataDict[tagName] = tagValue;
+	}
+
+	// Now metadataDict contains the image metadata as an NSDictionary
+
+	CFRelease(tags);
+
+	return (NSDictionary *)metadataDict;
+}
+
 - (nullable NSDictionary<NSString *, id> *)extendedMetadataForPhoto:(AVCapturePhoto *)photo
 {
 	NSMutableDictionary *metaData = [photo.metadata mutableCopy];
@@ -260,7 +313,61 @@
 	[metaData setObject:[self MotionDictionaryFor:motion] forKey:@"{DeviceMotion}"];
 
 	// Add a depth data embedded key
-	[metaData setObject:(photo.depthData != nil)?@(YES):@(NO) forKey:@"DepthDataEmbedded"];
+	// [metaData setObject:(photo.depthData != nil)?@(YES):@(NO) forKey:@"DepthDataEmbedded"];
+
+	if ( photo.depthData != nil)
+	{
+		NSString *depthType;
+		NSMutableDictionary *depthDict = [[photo.depthData dictionaryRepresentationForAuxiliaryDataType:&depthType] mutableCopy];
+		// strip out the binary depth data, we just want the meta data;
+		[depthDict removeObjectForKey:(NSString *)kCGImageAuxiliaryDataInfoData];
+		[depthDict setObject:depthType forKey:@"DepthDataType"];
+
+		// convert the CGImageData to NSDictionary it can be serialized to JSON as needed
+		CGImageMetadataRef depthImageMetadata = CFBridgingRetain([depthDict objectForKey:(NSString *)kCGImageAuxiliaryDataInfoMetadata]);
+		NSDictionary *depthImageMetaDataDictionary = [self convertCGMetaDataToNSDictionary:depthImageMetadata];
+		[depthDict setObject:depthImageMetaDataDictionary forKey:(NSString *)kCGImageAuxiliaryDataInfoMetadata];
+
+		NSString *depthFromat = @"";
+		switch( photo.depthData.depthDataType )
+		{
+			case kCVPixelFormatType_DisparityFloat16:
+			case kCVPixelFormatType_DepthFloat16:
+				depthFromat = [depthFromat stringByAppendingString:@"float16"];
+				break;
+			case kCVPixelFormatType_DisparityFloat32:
+			case kCVPixelFormatType_DepthFloat32:
+				depthFromat = [depthFromat stringByAppendingString:@"float32"];
+				break;
+			default:
+				depthFromat = [depthFromat stringByAppendingString:@"unkown"];
+				break;
+		}
+
+		CFByteOrder byteOrder = CFByteOrderGetCurrent();
+		switch( byteOrder )
+		{
+			case CFByteOrderBigEndian:
+				depthFromat = [depthFromat stringByAppendingString:@".BE"];
+				break;
+			case CFByteOrderLittleEndian:
+				depthFromat = [depthFromat stringByAppendingString:@".LE"];
+				break;
+			case CFByteOrderUnknown:
+				depthFromat = [depthFromat stringByAppendingString:@".__"];
+				break;
+		}
+		[depthDict setObject:depthFromat forKey:@"DepthFormat"];
+
+
+		[metaData setObject:@(NO) forKey:@"DepthDataEmbedded"];
+		[metaData setObject:depthDict forKey:@"{DepthMetaData}"];
+//		for (id key in depthImageMetaDataDictionary) {
+//			id value = [depthImageMetaDataDictionary objectForKey:key];
+//			NSLog(@"Key: %@, Type: %@", key, NSStringFromClass([key class]));
+//			NSLog(@"Value: %@, Type: %@", value, NSStringFromClass([value class]));
+//		}
+	}
 
 	return metaData;
 }
