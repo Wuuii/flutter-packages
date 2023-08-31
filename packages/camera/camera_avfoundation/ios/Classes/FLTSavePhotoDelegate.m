@@ -56,6 +56,23 @@
 	});
 }
 
+- (bool)isValidDepthData:(AVDepthData*)depthData {
+	bool result = false;
+	switch( depthData.depthDataType )
+	{
+		case kCVPixelFormatType_DisparityFloat16:
+		case kCVPixelFormatType_DepthFloat16:
+		case kCVPixelFormatType_DisparityFloat32:
+		case kCVPixelFormatType_DepthFloat32:
+			result = true;
+			break;
+		default:
+			result = false;
+			break;
+	}
+	return result;
+}
+
 - (void)handlePhotoCaptureResultWithError:(NSError *)error
 //						photoDataProvider:(NSData * (^)(void))photoDataProvider
 									photo:(AVCapturePhoto *)photo
@@ -77,7 +94,7 @@
 
 		NSError *ioError;
 		if ([data writeToFile:strongSelf.path options:NSDataWritingAtomic error:&ioError]) {
-			strongSelf.completionHandler(self.path, mutableMetaData, photo.depthData, nil);
+			strongSelf.completionHandler(self.path, mutableMetaData, ([self isValidDepthData:photo.depthData]) ? photo.depthData : nil, nil);
 		} else {
 			strongSelf.completionHandler(nil, nil, nil, ioError);
 		}
@@ -286,21 +303,24 @@
 
 - (NSDictionary *)convertCGMetaDataToNSDictionary:(CGImageMetadataRef)imageMetadata
 {
-	CFArrayRef tags = CGImageMetadataCopyTags(imageMetadata);
-	long count = CFArrayGetCount(tags);
-
 	NSMutableDictionary *metadataDict = [NSMutableDictionary dictionary];
 
-	for (int i = 0; i < count; i++) {
-		CGImageMetadataTagRef tag = (CGImageMetadataTagRef)CFArrayGetValueAtIndex(tags, i);
-		NSString *tagName = (__bridge NSString *)CGImageMetadataTagCopyName(tag);
-		id tagValue = (__bridge id)CGImageMetadataTagCopyValue(tag);
-		metadataDict[tagName] = tagValue;
+	if( imageMetadata != NULL )
+	{
+		CFArrayRef tags = CGImageMetadataCopyTags(imageMetadata);
+		long count = CFArrayGetCount(tags);
+
+		for (int i = 0; i < count; i++) {
+			CGImageMetadataTagRef tag = (CGImageMetadataTagRef)CFArrayGetValueAtIndex(tags, i);
+			NSString *tagName = (__bridge NSString *)CGImageMetadataTagCopyName(tag);
+			id tagValue = (__bridge id)CGImageMetadataTagCopyValue(tag);
+			metadataDict[tagName] = tagValue;
+		}
+
+		// Now metadataDict contains the image metadata as an NSDictionary
+
+		CFRelease(tags);
 	}
-
-	// Now metadataDict contains the image metadata as an NSDictionary
-
-	CFRelease(tags);
 
 	return (NSDictionary *)metadataDict;
 }
@@ -315,58 +335,67 @@
 	// Add a depth data embedded key
 	// [metaData setObject:(photo.depthData != nil)?@(YES):@(NO) forKey:@"DepthDataEmbedded"];
 
-	if ( photo.depthData != nil)
+	if( photo.depthData != nil )
 	{
 		NSString *depthType;
 		NSMutableDictionary *depthDict = [[photo.depthData dictionaryRepresentationForAuxiliaryDataType:&depthType] mutableCopy];
-		// strip out the binary depth data, we just want the meta data;
-		[depthDict removeObjectForKey:(NSString *)kCGImageAuxiliaryDataInfoData];
-		[depthDict setObject:depthType forKey:@"DepthDataType"];
 
-		// convert the CGImageData to NSDictionary it can be serialized to JSON as needed
-		CGImageMetadataRef depthImageMetadata = CFBridgingRetain([depthDict objectForKey:(NSString *)kCGImageAuxiliaryDataInfoMetadata]);
-		NSDictionary *depthImageMetaDataDictionary = [self convertCGMetaDataToNSDictionary:depthImageMetadata];
-		[depthDict setObject:depthImageMetaDataDictionary forKey:(NSString *)kCGImageAuxiliaryDataInfoMetadata];
-
-		NSString *depthFromat = @"";
-		switch( photo.depthData.depthDataType )
+		if( depthDict != nil )
 		{
-			case kCVPixelFormatType_DisparityFloat16:
-			case kCVPixelFormatType_DepthFloat16:
-				depthFromat = [depthFromat stringByAppendingString:@"float16"];
-				break;
-			case kCVPixelFormatType_DisparityFloat32:
-			case kCVPixelFormatType_DepthFloat32:
-				depthFromat = [depthFromat stringByAppendingString:@"float32"];
-				break;
-			default:
-				depthFromat = [depthFromat stringByAppendingString:@"unkown"];
-				break;
+			// strip out the binary depth data, we just want the meta data;
+			[depthDict removeObjectForKey:(NSString *)kCGImageAuxiliaryDataInfoData];
+			[depthDict setObject:depthType forKey:@"DepthDataType"];
+
+			// convert the CGImageData to NSDictionary it can be serialized to JSON as needed
+			CGImageMetadataRef depthImageMetadata = CFBridgingRetain([depthDict objectForKey:(NSString *)kCGImageAuxiliaryDataInfoMetadata]);
+			NSDictionary *depthImageMetaDataDictionary = [self convertCGMetaDataToNSDictionary:depthImageMetadata];
+			[depthDict setObject:depthImageMetaDataDictionary forKey:(NSString *)kCGImageAuxiliaryDataInfoMetadata];
+
+			NSLog(@"Depth Dict Start: %@",depthDict);
+
+			NSString *depthFromat = @"";
+			switch( photo.depthData.depthDataType )
+			{
+				case kCVPixelFormatType_DisparityFloat16:
+				case kCVPixelFormatType_DepthFloat16:
+					depthFromat = [depthFromat stringByAppendingString:@"float16"];
+					break;
+				case kCVPixelFormatType_DisparityFloat32:
+				case kCVPixelFormatType_DepthFloat32:
+					depthFromat = [depthFromat stringByAppendingString:@"float32"];
+					break;
+				default:
+					depthFromat = [depthFromat stringByAppendingString:@"unkown"];
+					break;
+			}
+
+			CFByteOrder byteOrder = CFByteOrderGetCurrent();
+			switch( byteOrder )
+			{
+				case CFByteOrderBigEndian:
+					depthFromat = [depthFromat stringByAppendingString:@".BE"];
+					break;
+				case CFByteOrderLittleEndian:
+					depthFromat = [depthFromat stringByAppendingString:@".LE"];
+					break;
+				case CFByteOrderUnknown:
+					depthFromat = [depthFromat stringByAppendingString:@".__"];
+					break;
+			}
+			[depthDict setObject:depthFromat forKey:@"DepthFormat"];
+
+			[metaData setObject:@(NO) forKey:@"DepthDataEmbedded"];
+
+			if( depthDict != NULL )
+			{
+				[metaData setObject:depthDict forKey:@"{DepthMetaData}"];
+			}
+			//		for (id key in depthImageMetaDataDictionary) {
+			//			id value = [depthImageMetaDataDictionary objectForKey:key];
+			//			NSLog(@"Key: %@, Type: %@", key, NSStringFromClass([key class]));
+			//			NSLog(@"Value: %@, Type: %@", value, NSStringFromClass([value class]));
+			//		}
 		}
-
-		CFByteOrder byteOrder = CFByteOrderGetCurrent();
-		switch( byteOrder )
-		{
-			case CFByteOrderBigEndian:
-				depthFromat = [depthFromat stringByAppendingString:@".BE"];
-				break;
-			case CFByteOrderLittleEndian:
-				depthFromat = [depthFromat stringByAppendingString:@".LE"];
-				break;
-			case CFByteOrderUnknown:
-				depthFromat = [depthFromat stringByAppendingString:@".__"];
-				break;
-		}
-		[depthDict setObject:depthFromat forKey:@"DepthFormat"];
-
-
-		[metaData setObject:@(NO) forKey:@"DepthDataEmbedded"];
-		[metaData setObject:depthDict forKey:@"{DepthMetaData}"];
-//		for (id key in depthImageMetaDataDictionary) {
-//			id value = [depthImageMetaDataDictionary objectForKey:key];
-//			NSLog(@"Key: %@, Type: %@", key, NSStringFromClass([key class]));
-//			NSLog(@"Value: %@, Type: %@", value, NSStringFromClass([value class]));
-//		}
 	}
 
 	return metaData;
