@@ -218,6 +218,8 @@ NSString *const errorMethod = @"error";
 	[self setCaptureSessionPreset:_resolutionPreset];
 	[self updateOrientation];
 
+	[self setZoomLevel:[self getMinAvailableZoomFactor]];
+
 	return self;
 }
 
@@ -1278,7 +1280,31 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
 	[result sendSuccess];
 }
 
+- (void)setZoomLevel:(CGFloat)zoom {
+
+	CGFloat maxAvailableZoomFactor = [self getMaxAvailableZoomFactor];
+	CGFloat minAvailableZoomFactor = [self getMinAvailableZoomFactor];
+
+	if( zoom < minAvailableZoomFactor ) zoom = minAvailableZoomFactor;
+	if( zoom > maxAvailableZoomFactor ) zoom = maxAvailableZoomFactor;
+
+	NSError *error = nil;
+	if (![_captureDevice lockForConfiguration:&error]) {
+		NSLog(@"Camera: Error setting zoom level to %0.2f: %@",zoom,error);
+		return;
+	}
+	NSLog(@"Camera:  Set Zoom factor to %0.2f",zoom);
+	_captureDevice.videoZoomFactor = zoom;
+	[_captureDevice unlockForConfiguration];
+}
+
 - (CGFloat)getMinAvailableZoomFactor {
+	if (@available(iOS 16.0, *)) {
+		if( _captureDevice.activeFormat.supportedVideoZoomFactorsForDepthDataDelivery.count > 0 ) {
+//			NSLog(@"%@ %@", @"supportedVideoZoomFactorsForDepthDataDelivery", _captureDevice.activeFormat.supportedVideoZoomFactorsForDepthDataDelivery);
+			return _captureDevice.activeFormat.supportedVideoZoomFactorsForDepthDataDelivery.firstObject.floatValue;
+		}
+	}
 	return _captureDevice.minAvailableVideoZoomFactor;
 }
 
