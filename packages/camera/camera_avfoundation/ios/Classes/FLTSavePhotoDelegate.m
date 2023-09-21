@@ -202,7 +202,10 @@
 	return gps;
 }
 
-- (NSDictionary *)MotionDictionaryFor:(CMDeviceMotion*)motion
+- (NSDictionary *)MotionDictionaryForMotion:(CMDeviceMotion*)motion
+					    	  accelleromter:(CMAccelerometerData*)accelerometerData
+							 		   gyro:(CMGyroData*)gyroData
+					 		   magnetometer:(CMMagnetometerData*)magnetometerData
 {
 	NSMutableDictionary *motionDict = [NSMutableDictionary dictionary];
 
@@ -245,6 +248,24 @@
 		motionDict[@"sensorLocation"] = @(motion.sensorLocation);
 	}
 
+	// Accelerometer (x, y, z)
+	motionDict[@"accelerometer"] = [NSMutableDictionary dictionary];
+	motionDict[@"accelerometer"][@"x"] = @(accelerometerData.acceleration.x);
+	motionDict[@"accelerometer"][@"y"] = @(accelerometerData.acceleration.y);
+	motionDict[@"accelerometer"][@"z"] = @(accelerometerData.acceleration.z);
+	
+	// Gyro (x, y, z)
+	motionDict[@"gyro"] = [NSMutableDictionary dictionary];
+	motionDict[@"gyro"][@"x"] = @(gyroData.rotationRate.x);
+	motionDict[@"gyro"][@"y"] = @(gyroData.rotationRate.y);
+	motionDict[@"gyro"][@"z"] = @(gyroData.rotationRate.z);
+
+	// Magnetometer (x, y, z)
+	motionDict[@"magnetometer"] = [NSMutableDictionary dictionary];
+	motionDict[@"magnetometer"][@"x"] = @(magnetometerData.magneticField.x);
+	motionDict[@"magnetometer"][@"y"] = @(magnetometerData.magneticField.y);
+	motionDict[@"magnetometer"][@"z"] = @(magnetometerData.magneticField.z);
+	
 	return motionDict;
 }
 
@@ -330,7 +351,17 @@
 	NSMutableDictionary *metaData = [photo.metadata mutableCopy];
 
 	CMDeviceMotion *motion = [_motionManager deviceMotion];
-	[metaData setObject:[self MotionDictionaryFor:motion] forKey:@"{DeviceMotion}"];
+	CMAccelerometerData *accelerometerData = [_motionManager accelerometerData];
+	CMGyroData *gyroData = [_motionManager gyroData];
+	CMMagnetometerData *magnetometerData = [_motionManager magnetometerData];
+	
+	[metaData setObject:[self MotionDictionaryForMotion:motion 
+										  accelleromter:accelerometerData
+										           gyro:gyroData
+										   magnetometer:magnetometerData]
+										    forKey:@"{DeviceMotion}"];
+
+	NSLog(@"Camera: MetaData: %@",metaData[@"{DeviceMotion}"]);
 
 	// Add a depth data embedded key
 	// [metaData setObject:(photo.depthData != nil)?@(YES):@(NO) forKey:@"DepthDataEmbedded"];

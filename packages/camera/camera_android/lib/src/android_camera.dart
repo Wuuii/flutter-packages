@@ -82,6 +82,10 @@ class AndroidCamera extends CameraPlatform {
         return CameraDescription(
           name: camera['name']! as String,
           localizedName: camera['localizedName']! as String,
+          fov: camera['fov']! as double,
+          fovDepth: camera['fovDepth']! as double,
+          maxZoomFactor: camera['maxZoomFactor']! as double,
+          depthSupported: camera['depthSupported']! as bool,
           lensDirection:
               parseCameraLensDirection(camera['lensFacing']! as String),
           sensorOrientation: camera['sensorOrientation']! as int,

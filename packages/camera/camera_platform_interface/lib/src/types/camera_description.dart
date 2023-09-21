@@ -23,6 +23,10 @@ class CameraDescription {
   const CameraDescription({
     required this.name,
     required this.localizedName,
+    required this.fov,
+    required this.fovDepth,
+    required this.maxZoomFactor,
+    required this.depthSupported,
     required this.lensDirection,
     required this.sensorOrientation,
   });
@@ -33,6 +37,18 @@ class CameraDescription {
   /// The localized name of the camera device.
   /// This is the name that should be displayed to the user.
   final String localizedName;
+
+  /// The field of view for the active camera format
+  final double fov;
+
+  // The field of view for the active depth camera format
+  final double fovDepth;
+
+  /// The maximum zoom factor for the active camera format
+  final double maxZoomFactor;
+
+  /// Whether the camera supports depth data
+  final bool depthSupported;
 
   /// The direction the camera is facing.
   final CameraLensDirection lensDirection;
@@ -52,7 +68,9 @@ class CameraDescription {
       other is CameraDescription &&
           runtimeType == other.runtimeType &&
           name == other.name &&
-          lensDirection == other.lensDirection;
+          lensDirection == other.lensDirection &&
+          fov == other.fov &&
+          depthSupported == other.depthSupported;
 
   @override
   int get hashCode => Object.hash(name, lensDirection);
@@ -60,6 +78,6 @@ class CameraDescription {
   @override
   String toString() {
     return '${objectRuntimeType(this, 'CameraDescription')}('
-        '$name, $localizedName, $lensDirection, $sensorOrientation)';
+        '$name, $localizedName, $fov, $fovDepth, $maxZoomFactor, $depthSupported, $lensDirection, $sensorOrientation)';
   }
 }

@@ -4,6 +4,7 @@
 
 @import AVFoundation;
 @import CoreLocation;
+@import CoreMotion;
 @import Foundation;
 @import Flutter;
 
@@ -45,6 +46,7 @@ NS_ASSUME_NONNULL_BEGIN
                        orientation:(UIDeviceOrientation)orientation
                captureSessionQueue:(dispatch_queue_t)captureSessionQueue
                    locationManager:(CLLocationManager *)locationManager
+					 motionManager:(CMMotionManager *)motionManager
                              error:(NSError **)error;
 - (void)start;
 - (void)stop;
