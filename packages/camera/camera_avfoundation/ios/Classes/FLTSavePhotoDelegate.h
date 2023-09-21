@@ -33,14 +33,15 @@ typedef void (^FLTSavePhotoDelegateCompletionHandler)(NSString *_Nullable path,
  * Initialize a photo capture delegate.
  * @param path the path for captured photo file.
  * @param ioQueue the queue on which captured photos are written to disk.
- * @param locationManager the location manger for add GPS metadata to the photo
+ * @param locationManager the location manger for adding GPS metadata to the photo
+ * @param motionManager the motion manger for adding motion metadata to the photo
  * @param completionHandler The completion handler block for save photo operations. Can
  * be called from either main queue or IO queue.
  */
 - (instancetype)initWithPath:(NSString *)path
                      ioQueue:(dispatch_queue_t)ioQueue
              locationManager:(CLLocationManager *)locationManager
-			   motionManager:(CMMotionManager *)motionManager
+	       motionManager:(CMMotionManager *)motionManager
            completionHandler:(FLTSavePhotoDelegateCompletionHandler)completionHandler;
 @end
 

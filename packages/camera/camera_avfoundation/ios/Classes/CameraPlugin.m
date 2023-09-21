@@ -7,6 +7,7 @@
 
 @import AVFoundation;
 @import CoreLocation;
+@import CoreMotion;
 
 #import "CameraPermissionUtils.h"
 #import "CameraProperties.h"
@@ -20,7 +21,8 @@
 @interface CameraPlugin ()
 @property(readonly, nonatomic) FLTThreadSafeTextureRegistry *registry;
 @property(readonly, nonatomic) NSObject<FlutterBinaryMessenger> *messenger;
-@property(readonly, nonatomic) CLLocationManager *locationManager;
+@property(nonatomic) CLLocationManager *locationManager;
+@property(nonatomic) CMMotionManager *motionManager;
 @end
 
 @implementation CameraPlugin
@@ -46,6 +48,8 @@
 
   [self initDeviceEventMethodChannel];
   [self startOrientationListener];
+  [self initLocationManager];
+  [self initMotionManager];
   return self;
 }
 
@@ -91,6 +95,15 @@
   [_deviceEventMethodChannel
       invokeMethod:@"orientation_changed"
          arguments:@{@"orientation" : FLTGetStringForUIDeviceOrientation(orientation)}];
+}
+
+- (void)initLocationManager {
+  self.locationManager = [[CLLocationManager alloc] init];
+}
+
+- (void)initMotionManager {
+  // TODO(kb): Should try using CMBatchedSensorManager when ios 17 is released.
+  self.motionManager = [[CMMotionManager alloc] init];
 }
 
 - (void)handleMethodCall:(FlutterMethodCall *)call result:(FlutterResult)result {
@@ -144,13 +157,36 @@
           lensFacing = @"external";
           break;
       }
+      // NSLog(@"device: %@", device);
+      // NSLog(@"device.activeFormat: %@", device.activeFormat);
+
+      // NSLog(@"device.activeDepthFormat: %@", device.activeDepthDataFormat);
+      // NSLog(@"device.activeFormat.maxZoomFactor: %f", device.activeFormat.videoMaxZoomFactor);
+      // NSLog(@"device.activeDepthDataFormat.maxZoomFactor: %f", device.activeDepthDataFormat.videoMaxZoomFactor);
+
+      // NSLog(@"device.videoZoomFactor: %f", device.videoZoomFactor);
+      // NSLog(@"device.minAvailableVideoZoomFactor: %f", device.minAvailableVideoZoomFactor);
+      // NSLog(@"device.maxAvailableVideoZoomFactor: %f", device.maxAvailableVideoZoomFactor);
+
+      double fov = device.activeFormat.videoFieldOfView;
+      double depthFov = device.activeFormat.videoFieldOfView;
+      double maxZoomFactor = device.activeFormat.videoMaxZoomFactor;
+      if( device.activeDepthDataFormat != nil ) {
+        depthFov = device.activeDepthDataFormat.videoFieldOfView;
+        maxZoomFactor = device.activeDepthDataFormat.videoMaxZoomFactor;
+      }
       [reply addObject:@{
         @"name" : [device uniqueID],
         @"localizedName" : [device localizedName],
+		    @"fov" : [NSNumber numberWithFloat:fov],
+        @"fovDepth" : [NSNumber numberWithFloat:depthFov],
+        @"maxZoomFactor" : [NSNumber numberWithFloat:maxZoomFactor],
+        @"depthSupported" : [[[device activeFormat] supportedDepthDataFormats] count] > 0 ? @YES : @NO,
         @"lensFacing" : lensFacing,
         @"sensorOrientation" : @90,
       }];
     }
+    NSLog(@"cameras => %@",reply);
     [result sendSuccessWithData:reply];
   } else if ([@"create" isEqualToString:call.method]) {
     [self handleCreateMethodCall:call result:result];
@@ -288,7 +324,8 @@
       [result sendFlutterError:error];
     } else {
       // Create core location manager, and request permission if necessary.
-      strongSelf->_locationManager = [[CLLocationManager alloc] init];
+      // strongSelf->_locationManager = [[CLLocationManager alloc] init];
+
       switch ([CLLocationManager authorizationStatus]) {
         case kCLAuthorizationStatusAuthorizedWhenInUse:
             NSLog(@"Camera: Location permission granted, will add GPS metadata to photos."); 
@@ -303,7 +340,6 @@
             NSLog(@"*** Camera: Location permission denied, unable to add GPS metadata to photos.");
       }
 
-
       // Request audio permission on `create` call with `enableAudio` argument instead of the
       // `prepareForVideoRecording` call. This is because `prepareForVideoRecording` call is
       // optional, and used as a workaround to fix a missing frame issue on iOS.
@@ -317,11 +353,11 @@
           if (error) {
             [result sendFlutterError:error];
           } else {
-            [strongSelf createCameraOnSessionQueueWithCreateMethodCall:call locationManager:strongSelf->_locationManager result:result];
+            [strongSelf createCameraOnSessionQueueWithCreateMethodCall:call locationManager:strongSelf->_locationManager motionManager:strongSelf->_motionManager result:result];
           }
         });
       } else {
-        [strongSelf createCameraOnSessionQueueWithCreateMethodCall:call locationManager:strongSelf->_locationManager result:result];
+        [strongSelf createCameraOnSessionQueueWithCreateMethodCall:call locationManager:strongSelf->_locationManager motionManager:strongSelf->_motionManager result:result];
       }
     }
   });
@@ -329,6 +365,7 @@
 
 - (void)createCameraOnSessionQueueWithCreateMethodCall:(FlutterMethodCall *)createMethodCall
                                       locationManager:(CLLocationManager *)locationManager
+                                      motionManager:(CMMotionManager *)motionManager
                                                 result:(FLTThreadSafeFlutterResult *)result {
   __weak typeof(self) weakSelf = self;
   dispatch_async(self.captureSessionQueue, ^{
@@ -344,7 +381,8 @@
                                          enableAudio:[enableAudio boolValue]
                                          orientation:[[UIDevice currentDevice] orientation]
                                  captureSessionQueue:strongSelf.captureSessionQueue
-                                      locationManager:locationManager
+                                     locationManager:locationManager
+                                       motionManager:motionManager
                                                error:&error];
 
     if (error) {

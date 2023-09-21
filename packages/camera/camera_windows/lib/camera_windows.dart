@@ -54,6 +54,10 @@ class CameraWindows extends CameraPlatform {
         return CameraDescription(
           name: camera['name'] as String,
           localizedName: camera['name'] as String,
+          fov: camera['fov'] as String,
+          fovDepth: camera['fovDepth'] as String,
+          maxZoomFactor: camera['maxZoomFactor'] as String,
+          depthSupported: camera['depthSupported'] as bool,
           lensDirection:
               parseCameraLensDirection(camera['lensFacing'] as String),
           sensorOrientation: camera['sensorOrientation'] as int,

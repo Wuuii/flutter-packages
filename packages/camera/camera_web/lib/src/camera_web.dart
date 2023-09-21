@@ -163,6 +163,10 @@ class CameraPlugin extends CameraPlatform {
           final CameraDescription camera = CameraDescription(
             name: cameraLabel,
             localizedName: cameraLabel,
+            fov: "0",
+            fovDepth: "0",
+            maxZoomFactor: 1.0,
+            depthSupported: false,
             lensDirection: lensDirection,
             sensorOrientation: 0,
           );

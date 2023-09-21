@@ -100,6 +100,7 @@ NSString *const errorMethod = @"error";
 					   orientation:(UIDeviceOrientation)orientation
 			   captureSessionQueue:(dispatch_queue_t)captureSessionQueue
 				   locationManager:(CLLocationManager *)locationManager
+				   	 motionManager:(CMMotionManager *)motionManager
 							 error:(NSError **)error {
 	return [self initWithCameraName:cameraName
 				   resolutionPreset:resolutionPreset
@@ -109,6 +110,7 @@ NSString *const errorMethod = @"error";
 				audioCaptureSession:[[AVCaptureSession alloc] init]
 				captureSessionQueue:captureSessionQueue
 					locationManager:(CLLocationManager *)locationManager
+					  motionManager:(CMMotionManager *)motionManager
 							  error:error];
 }
 
@@ -120,6 +122,7 @@ NSString *const errorMethod = @"error";
 			   audioCaptureSession:(AVCaptureSession *)audioCaptureSession
 			   captureSessionQueue:(dispatch_queue_t)captureSessionQueue
 				   locationManager:(CLLocationManager *)locationManager
+				   	 motionManager:(CMMotionManager *)motionManager
 							 error:(NSError **)error {
 	self = [super init];
 	NSAssert(self, @"super init cannot be nil");
@@ -144,6 +147,7 @@ NSString *const errorMethod = @"error";
 	_videoFormat = kCVPixelFormatType_32BGRA;
 	_inProgressSavePhotoDelegates = [NSMutableDictionary dictionary];
 	_locationManager = locationManager;
+	_motionManager = motionManager;
 
 	// To limit memory consumption, limit the number of frames pending processing.
 	// After some testing, 4 was determined to be the best maximum value.
@@ -196,24 +200,48 @@ NSString *const errorMethod = @"error";
 	// set the depth data format to the max possible quality
 	if( bestDepthFormat != nil ) {
 		[_captureDevice lockForConfiguration:nil];
-		NSLog(@"Setting Camera.ActiveDepthFormat      => %@",bestDepthFormat);
+		// NSLog(@"Setting Camera.ActiveDepthFormat      => %@",bestDepthFormat);
 		[_captureDevice setActiveDepthDataFormat:bestDepthFormat];
 		[_captureDevice unlockForConfiguration];
 	}
 
-	NSLog(@"Camera.PhotoOutput       => %@ [%@]",self.capturePhotoOutput,_captureDevice);
-	NSLog(@"Camera.ActiveFormat      => %@",_captureDevice.activeFormat);
-	NSLog(@"Camera.ActiveDepthFormat => %@",_captureDevice.activeDepthDataFormat);
-	NSLog(@"Camera.DepthFormats      => %@", depthFormats);
+	// NSLog(@"Camera.PhotoOutput       => %@ [%@]",self.capturePhotoOutput,_captureDevice);
+	// NSLog(@"Camera.ActiveFormat      => %@",_captureDevice.activeFormat);
+	// NSLog(@"Camera.ActiveDepthFormat => %@",_captureDevice.activeDepthDataFormat);
+	// NSLog(@"Camera.DepthFormats      => %@", depthFormats);
 
 	[_videoCaptureSession addOutput:_capturePhotoOutput];
 
-	CLLocation *location = [_locationManager location];
-	NSLog(@"Camera.InitLocation      => %@      Location: %@",_locationManager, location);
+	// CLLocation *location = [_locationManager location];
+	// NSLog(@"Camera.InitLocation      => %@      Location: %@",_locationManager, location);
 
-	_motionManager = [[CMMotionManager alloc] init];
+	// _motionManager = [[CMMotionManager alloc] init];
 	[_motionManager startAccelerometerUpdates];
+	[_motionManager startGyroUpdates];
 	[_motionManager startDeviceMotionUpdates];
+	[_motionManager startMagnetometerUpdates];
+
+	// NSLog(@"Camera: MotionManager => %@",_motionManager);
+	// NSLog(@"Camera: MotionManager => %@",_motionManager.accelerometerData);
+	// NSLog(@"Camera: MotionManager Motion Active => %@",_motionManager.isDeviceMotionActive ? @"Y":@"N");
+	// NSLog(@"Camera: MotionManager Accel Active => %@",_motionManager.isAccelerometerActive ? @"Y":@"N");
+	// NSLog(@"Camera: MotionManager Gyro Active => %@",_motionManager.isGyroActive ? @"Y":@"N");
+	// NSLog(@"Camera: MotionManager Magno Active => %@",_motionManager.isMagnetometerActive ? @"Y":@"N");
+
+	// if ( _motionManager.isDeviceMotionActive ) {
+	// 	NSLog(@"Camera: Motion = %@",_motionManager.deviceMotion);
+	// }
+	// if ( _motionManager.isAccelerometerActive ) {
+	// 	NSLog(@"Camera: Accel = %@",_motionManager.accelerometerData);
+	// }
+
+	// if ( _motionManager.isGyroActive ) {
+	// 	NSLog(@"Camera: Gryo = %@",_motionManager.gyroData);
+	// }
+
+	// if ( _motionManager.isMagnetometerActive ) {
+	// 	NSLog(@ "Camera: Magno = %@",_motionManager.magnetometerData);
+	// }
 
 	[self setCaptureSessionPreset:_resolutionPreset];
 	[self updateOrientation];
@@ -831,6 +859,8 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
 	}
 	[_motionManager stopDeviceMotionUpdates];
 	[_motionManager stopAccelerometerUpdates];
+	[_motionManager stopGyroUpdates];
+	[_motionManager stopMagnetometerUpdates];
 }
 
 - (CVPixelBufferRef)copyPixelBuffer {
